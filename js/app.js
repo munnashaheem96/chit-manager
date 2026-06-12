@@ -1,5 +1,6 @@
-import { db } from "./firebase.js";
+import { db, auth } from "./firebase.js";
 import { collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { checkAndSeed } from "./seedData.js";
 import { initBoard, renderBoard } from "./board.js";
 import { initQuickEntry } from "./payments.js";
@@ -20,6 +21,12 @@ let lotsLoaded = false;
 
 let activeView = "board"; // Default home view
 
+// Auth & Listener Tracking States
+let unsubscribeMembers = null;
+let unsubscribeLedgers = null;
+let unsubscribeLots = null;
+let isInitialized = false;
+
 // Export globally for inline editing input references
 window.appDb = db;
 window.renderKuriBoard = () => {
@@ -34,31 +41,160 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupConnectionIndicator();
   setupBackupRestore();
   setupKeyboardShortcuts();
-
-  const statusEl = document.getElementById("loader-status");
-  
-  try {
-    // 1. Run Seeding check
-    await checkAndSeed(db, (msg) => {
-      if (statusEl) statusEl.textContent = msg;
-    });
-
-    // 2. Attach Firestore Realtime Listeners
-    setupRealtimeListeners();
-
-  } catch (error) {
-    console.error("Initialization error:", error);
-    if (statusEl) {
-      statusEl.innerHTML = `<span style="color: var(--color-due);">Initialization Failed: ${error.message}</span>`;
-    }
-  }
+  setupAuthListeners();
+  setupLoginForm();
+  setupLogoutBtn();
 });
+
+// Setup standard Firebase Auth observer
+function setupAuthListeners() {
+  const loader = document.getElementById("loader-overlay");
+  const statusEl = document.getElementById("loader-status");
+  const loginContainer = document.getElementById("login-container");
+  const appContainer = document.querySelector(".app-container");
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      // User is logged in
+      if (loginContainer) loginContainer.style.display = "none";
+      if (appContainer) appContainer.style.display = "flex";
+      
+      // If we haven't initialized our listeners and DB seed check, do it now
+      if (!isInitialized) {
+        isInitialized = true;
+        if (loader) {
+          loader.style.display = "flex";
+          loader.style.opacity = "1";
+        }
+        if (statusEl) statusEl.textContent = "Checking database status...";
+
+        try {
+          // 1. Run Seeding check
+          await checkAndSeed(db, (msg) => {
+            if (statusEl) statusEl.textContent = msg;
+          });
+
+          // 2. Attach Firestore Realtime Listeners
+          setupRealtimeListeners();
+        } catch (error) {
+          console.error("Initialization error:", error);
+          if (statusEl) {
+            statusEl.innerHTML = `<span style="color: var(--color-due);">Initialization Failed: ${error.message}</span>`;
+          }
+        }
+      }
+    } else {
+      // User is logged out
+      // 1. Unsubscribe from active realtime listeners
+      if (unsubscribeMembers) { unsubscribeMembers(); unsubscribeMembers = null; }
+      if (unsubscribeLedgers) { unsubscribeLedgers(); unsubscribeLedgers = null; }
+      if (unsubscribeLots) { unsubscribeLots(); unsubscribeLots = null; }
+
+      // 2. Clear state variables
+      membersLoaded = false;
+      ledgersLoaded = false;
+      lotsLoaded = false;
+      isInitialized = false;
+      globalMembers = [];
+      globalLedgers = [];
+      globalLots = [];
+
+      // 3. Update visibility
+      if (appContainer) appContainer.style.display = "none";
+      if (loader) loader.style.display = "none";
+      if (loginContainer) loginContainer.style.display = "flex";
+    }
+  });
+}
+
+// Setup login form controls
+function setupLoginForm() {
+  const loginForm = document.getElementById("login-form");
+  const loginError = document.getElementById("login-error");
+  const loginErrorText = document.getElementById("login-error-text");
+
+  if (!loginForm) return;
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById("login-email").value.trim();
+    const password = document.getElementById("login-password").value;
+
+    if (loginError) loginError.style.display = "none";
+
+    const submitBtn = loginForm.querySelector(".login-submit-btn");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      const span = submitBtn.querySelector("span");
+      if (span) span.textContent = "Signing In...";
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      showToast("Signed in successfully!", "success");
+    } catch (err) {
+      console.error("Authentication failed:", err);
+      let errMsg = "Incorrect credentials. Please try again.";
+      if (err.code === "auth/invalid-email") {
+        errMsg = "Invalid email format.";
+      } else if (err.code === "auth/user-disabled") {
+        errMsg = "This user account has been disabled.";
+      } else if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        errMsg = "Incorrect email or password.";
+      } else if (err.code === "auth/too-many-requests") {
+        errMsg = "Too many failed attempts. Try again later.";
+      }
+
+      if (loginError && loginErrorText) {
+        loginErrorText.textContent = errMsg;
+        loginError.style.display = "flex";
+      } else {
+        showToast(errMsg, "error");
+      }
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        const span = submitBtn.querySelector("span");
+        if (span) span.textContent = "Sign In";
+      }
+    }
+  });
+}
+
+// Setup logout button actions
+function setupLogoutBtn() {
+  const btnLogout = document.getElementById("btn-logout");
+  if (!btnLogout) return;
+
+  btnLogout.addEventListener("click", async (e) => {
+    e.preventDefault();
+
+    const confirmed = await customConfirm(
+      "Confirm Sign Out",
+      "Are you sure you want to log out of Kuri Manager?",
+      false
+    );
+
+    if (confirmed) {
+      try {
+        await signOut(auth);
+        showToast("Signed out successfully.", "info");
+        // Force fully fresh window refresh to ensure memory state resets clean
+        window.location.reload();
+      } catch (err) {
+        console.error("Signout error:", err);
+        showToast(`Sign out failed: ${err.message}`, "error");
+      }
+    }
+  });
+}
 
 function setupRealtimeListeners() {
   const loader = document.getElementById("loader-overlay");
 
   // Members Listener
-  onSnapshot(collection(db, "members"), (snap) => {
+  unsubscribeMembers = onSnapshot(collection(db, "members"), (snap) => {
     globalMembers = [];
     snap.forEach(doc => {
       globalMembers.push(doc.data());
@@ -71,7 +207,7 @@ function setupRealtimeListeners() {
   });
 
   // Ledger Listener
-  onSnapshot(collection(db, "monthlyLedger"), (snap) => {
+  unsubscribeLedgers = onSnapshot(collection(db, "monthlyLedger"), (snap) => {
     globalLedgers = [];
     snap.forEach(doc => {
       globalLedgers.push(doc.data());
@@ -84,7 +220,7 @@ function setupRealtimeListeners() {
   });
 
   // Lots Listener
-  onSnapshot(collection(db, "lots"), (snap) => {
+  unsubscribeLots = onSnapshot(collection(db, "lots"), (snap) => {
     globalLots = [];
     snap.forEach(doc => {
       globalLots.push(doc.data());
@@ -287,6 +423,8 @@ function setupKeyboardShortcuts() {
   document.addEventListener("keydown", (e) => {
     // Only check Alt combinations
     if (!e.altKey) return;
+    // Don't trigger shortcuts if user is not logged in
+    if (!auth.currentUser) return;
 
     switch (e.key.toLowerCase()) {
       case "b": // Alt+B: Board

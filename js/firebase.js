@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDt6i-UNggkLVADH8TPCtKTDxPV9wXMPFs",
@@ -12,6 +13,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+// Initialize Firebase Authentication
+const auth = getAuth(app);
+
 // Enable offline persistence in v10+
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
@@ -19,4 +23,4 @@ const db = initializeFirestore(app, {
   })
 });
 
-export { db };
+export { db, auth };

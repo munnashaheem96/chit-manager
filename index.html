@@ -25,6 +25,41 @@
     <div id="loader-status" class="loader-status">Initializing KL2 Kuri Manager...</div>
   </div>
 
+  <!-- Login Container -->
+  <div id="login-container" class="login-container" style="display: none;">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">KL</div>
+        <h2>KL2 Kuri Manager</h2>
+        <p>Sign in to access your dashboard</p>
+      </div>
+      <form id="login-form" autocomplete="on">
+        <div class="login-form-group">
+          <label for="login-email">Email Address</label>
+          <div class="input-with-icon">
+            <i class="fas fa-envelope"></i>
+            <input type="email" id="login-email" placeholder="admin@example.com" required autocomplete="email">
+          </div>
+        </div>
+        <div class="login-form-group">
+          <label for="login-password">Password</label>
+          <div class="input-with-icon">
+            <i class="fas fa-lock"></i>
+            <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password">
+          </div>
+        </div>
+        <button type="submit" class="btn-primary login-submit-btn">
+          <span>Sign In</span>
+          <i class="fas fa-arrow-right"></i>
+        </button>
+      </form>
+      <div id="login-error" class="login-error-msg" style="display: none;">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span id="login-error-text">Incorrect credentials</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Main App Container -->
   <div class="app-container">
     
@@ -56,6 +91,9 @@
         </a>
         <a class="menu-item" data-view="settings">
           <i class="fas fa-cog"></i> Backup & Settings
+        </a>
+        <a class="menu-item logout-btn" id="btn-logout">
+          <i class="fas fa-sign-out-alt"></i> Logout
         </a>
       </nav>
       
