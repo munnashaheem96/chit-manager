@@ -1,5 +1,6 @@
 import { doc, updateDoc, setDoc, getDoc, collection, addDoc, getDocs, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { showToast } from "./app.js";
+import { auth } from "./firebase.js";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -326,6 +327,10 @@ function navigateGrid(rIdx, cIdx) {
 }
 
 function enterEditMode(cell) {
+  if (auth.currentUser && auth.currentUser.isAnonymous) {
+    showToast("Guest Mode: Editing is disabled.", "info");
+    return;
+  }
   if (isEditing) return;
   isEditing = true;
 

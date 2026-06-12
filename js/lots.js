@@ -1,5 +1,6 @@
 import { doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { showToast, customConfirm } from "./app.js";
+import { auth } from "./firebase.js";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -337,6 +338,9 @@ function setupLotsForm(db) {
 }
 
 function openLotDrawPanel(db, month, balanceBeforeMap) {
+  if (auth.currentUser && auth.currentUser.isAnonymous) {
+    return;
+  }
   selectedMonth = month;
   
   const lot = lotsMap[month] || {};

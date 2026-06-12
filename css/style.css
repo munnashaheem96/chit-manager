@@ -1355,3 +1355,59 @@ body {
   background-color: var(--color-due-bg) !important;
   color: var(--color-due) !important;
 }
+
+/* ==========================================================================
+   ANONYMOUS / GUEST VIEW RULES
+   ========================================================================== */
+
+/* Login card divider & guest button */
+.login-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 8px 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.login-divider:not(:empty)::before {
+  margin-right: .75em;
+}
+
+.login-divider:not(:empty)::after {
+  margin-left: .75em;
+}
+
+.guest-login-btn {
+  width: 100%;
+  justify-content: center;
+  gap: 8px;
+  border-color: var(--border-color);
+  background-color: transparent;
+  color: var(--text-secondary);
+}
+
+.guest-login-btn:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* Guest mode navigation and feature restrictions */
+body.guest-mode .sidebar-menu [data-view="quick-entry"],
+body.guest-mode .sidebar-menu [data-view="settings"] {
+  display: none !important;
+}
+
+body.guest-mode .lot-table th:last-child,
+body.guest-mode .lot-table td:last-child {
+  display: none !important;
+}

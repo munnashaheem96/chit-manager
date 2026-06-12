@@ -1,6 +1,6 @@
 import { db, auth } from "./firebase.js";
 import { collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { checkAndSeed } from "./seedData.js";
 import { initBoard, renderBoard } from "./board.js";
 import { initQuickEntry } from "./payments.js";
@@ -59,6 +59,20 @@ function setupAuthListeners() {
       if (loginContainer) loginContainer.style.display = "none";
       if (appContainer) appContainer.style.display = "flex";
       
+      if (user.isAnonymous) {
+        document.body.classList.add("guest-mode");
+        const logoutBtn = document.getElementById("btn-logout");
+        if (logoutBtn) {
+          logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Exit Guest Mode';
+        }
+      } else {
+        document.body.classList.remove("guest-mode");
+        const logoutBtn = document.getElementById("btn-logout");
+        if (logoutBtn) {
+          logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
+        }
+      }
+
       // If we haven't initialized our listeners and DB seed check, do it now
       if (!isInitialized) {
         isInitialized = true;
@@ -69,10 +83,14 @@ function setupAuthListeners() {
         if (statusEl) statusEl.textContent = "Checking database status...";
 
         try {
-          // 1. Run Seeding check
-          await checkAndSeed(db, (msg) => {
-            if (statusEl) statusEl.textContent = msg;
-          });
+          if (user.isAnonymous) {
+            if (statusEl) statusEl.textContent = "Loading Guest Dashboard...";
+          } else {
+            // 1. Run Seeding check
+            await checkAndSeed(db, (msg) => {
+              if (statusEl) statusEl.textContent = msg;
+            });
+          }
 
           // 2. Attach Firestore Realtime Listeners
           setupRealtimeListeners();
@@ -112,6 +130,20 @@ function setupLoginForm() {
   const loginForm = document.getElementById("login-form");
   const loginError = document.getElementById("login-error");
   const loginErrorText = document.getElementById("login-error-text");
+  const btnGuestLogin = document.getElementById("btn-guest-login");
+
+  if (btnGuestLogin) {
+    btnGuestLogin.addEventListener("click", async () => {
+      try {
+        showToast("Signing in as Guest...", "info");
+        await signInAnonymously(auth);
+        showToast("Signed in as Guest successfully!", "success");
+      } catch (err) {
+        console.error("Guest Sign-in failed:", err);
+        showToast(`Guest Access Failed: ${err.message}`, "error");
+      }
+    });
+  }
 
   if (!loginForm) return;
 
@@ -170,9 +202,15 @@ function setupLogoutBtn() {
   btnLogout.addEventListener("click", async (e) => {
     e.preventDefault();
 
+    const isGuest = auth.currentUser && auth.currentUser.isAnonymous;
+    const title = isGuest ? "Exit Guest Mode" : "Confirm Sign Out";
+    const msg = isGuest 
+      ? "Are you sure you want to exit Guest Mode?" 
+      : "Are you sure you want to log out of Kuri Manager?";
+
     const confirmed = await customConfirm(
-      "Confirm Sign Out",
-      "Are you sure you want to log out of Kuri Manager?",
+      title,
+      msg,
       false
     );
 
@@ -426,12 +464,15 @@ function setupKeyboardShortcuts() {
     // Don't trigger shortcuts if user is not logged in
     if (!auth.currentUser) return;
 
+    const isGuest = auth.currentUser.isAnonymous;
+
     switch (e.key.toLowerCase()) {
       case "b": // Alt+B: Board
         e.preventDefault();
         triggerNavClick("board");
         break;
       case "q": // Alt+Q: Quick Entry
+        if (isGuest) break;
         e.preventDefault();
         triggerNavClick("quick-entry");
         break;
@@ -452,6 +493,7 @@ function setupKeyboardShortcuts() {
         triggerNavClick("reports");
         break;
       case "s": // Alt+S: Settings
+        if (isGuest) break;
         e.preventDefault();
         triggerNavClick("settings");
         break;
