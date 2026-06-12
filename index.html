@@ -73,6 +73,9 @@
   <!-- Main App Container -->
   <div class="app-container">
     
+    <!-- Sidebar Overlay backdrop for mobile -->
+    <div id="sidebar-overlay" class="sidebar-overlay"></div>
+    
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -120,6 +123,9 @@
       
       <!-- Top App Header -->
       <header class="top-header">
+        <button id="btn-toggle-sidebar" class="btn-icon mobile-menu-btn" title="Toggle Sidebar" style="display: none;">
+          <i class="fas fa-bars"></i>
+        </button>
         <div class="header-title-area">
           <h2 id="active-view-title">Excel Kuri Board</h2>
         </div>
@@ -201,12 +207,12 @@
 
             <!-- Profile Details Block (Hidden initially) -->
             <div id="member-profile-details" class="member-profiles-layout" style="display: none;">
-              <div style="display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-secondary); padding: 20px 24px; border-radius: 12px; border: 1px solid var(--border-color);">
+              <div class="profile-header-card">
                 <div>
                   <h2 id="profile-name" style="margin-bottom: 4px;">Sherbin</h2>
                   <span id="profile-serial" class="profile-card-label" style="font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--primary-color);">#1</span>
                 </div>
-                <div style="display: flex; gap: 12px;">
+                <div class="profile-header-actions">
                   <button id="btn-member-pdf" class="btn-primary">
                     <i class="fas fa-file-pdf"></i> Export PDF
                   </button>

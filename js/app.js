@@ -44,6 +44,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupAuthListeners();
   setupLoginForm();
   setupLogoutBtn();
+  setupMobileSidebar();
 });
 
 // Setup standard Firebase Auth observer
@@ -590,5 +591,43 @@ export function customConfirm(title, message, isDanger = false) {
     // Use once: true to ensure event handlers don't leak
     btnOk.addEventListener("click", onOk, { once: true });
     btnCancel.addEventListener("click", onCancel, { once: true });
+  });
+}
+
+// Setup mobile sidebar slide behavior
+function setupMobileSidebar() {
+  const toggleBtn = document.getElementById("btn-toggle-sidebar");
+  const sidebar = document.querySelector(".sidebar");
+  const overlay = document.getElementById("sidebar-overlay");
+  const menuItems = document.querySelectorAll(".sidebar-menu .menu-item");
+
+  if (!toggleBtn || !sidebar || !overlay) return;
+
+  const openSidebar = () => {
+    sidebar.classList.add("open");
+    overlay.classList.add("active");
+  };
+
+  const closeSidebar = () => {
+    sidebar.classList.remove("open");
+    overlay.classList.remove("active");
+  };
+
+  toggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (sidebar.classList.contains("open")) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  });
+
+  overlay.addEventListener("click", closeSidebar);
+
+  // Close sidebar when clicking any menu link on mobile
+  menuItems.forEach(item => {
+    item.addEventListener("click", () => {
+      closeSidebar();
+    });
   });
 }
