@@ -222,3 +222,131 @@ export async function importBackupJSON(db, file) {
     reader.readAsText(file);
   });
 }
+
+// Export Table As Image (PNG) up to current month status
+export async function exportTableAsImage(tableId, currentMonthIndex, MONTHS) {
+  const table = document.getElementById(tableId);
+  if (!table) {
+    showToast("Table not found.", "error");
+    return;
+  }
+
+  try {
+    showToast("Preparing image download...", "info");
+
+    // Create a temporary off-screen wrapper container for rendering
+    const exportContainer = document.createElement("div");
+    exportContainer.style.position = "absolute";
+    exportContainer.style.left = "-9999px";
+    exportContainer.style.top = "-9999px";
+    exportContainer.style.width = "auto";
+    exportContainer.style.padding = "24px";
+
+    const isLight = document.body.classList.contains("light-mode");
+    const bgColor = isLight ? "#f8fafc" : "#0b0f19";
+    const textColor = isLight ? "#0f172a" : "#f3f4f6";
+    const borderColor = isLight ? "rgba(0, 0, 0, 0.08)" : "rgba(255, 255, 255, 0.08)";
+
+    exportContainer.style.backgroundColor = bgColor;
+    exportContainer.style.color = textColor;
+    exportContainer.style.fontFamily = "'Outfit', sans-serif";
+    exportContainer.style.borderRadius = "12px";
+    exportContainer.style.border = `1px solid ${borderColor}`;
+
+    // Premium Header block for the image
+    const header = document.createElement("div");
+    header.style.marginBottom = "20px";
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+
+    const titleInfo = document.createElement("div");
+    titleInfo.innerHTML = `
+      <h2 style="margin: 0; font-size: 1.6rem; font-weight: 700; background: linear-gradient(135deg, ${isLight ? '#4f46e5' : '#6366f1'}, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">KL2 KURI BOARD</h2>
+      <p style="margin: 4px 0 0 0; font-size: 0.9rem; color: ${isLight ? '#475569' : '#9ca3af'}; font-weight: 500;">Ledger status up to ${MONTHS[currentMonthIndex]} ${currentYear}</p>
+    `;
+    header.appendChild(titleInfo);
+
+    const logo = document.createElement("div");
+    logo.style.width = "40px";
+    logo.style.height = "40px";
+    logo.style.background = `linear-gradient(135deg, ${isLight ? '#4f46e5' : '#6366f1'}, #818cf8)`;
+    logo.style.borderRadius = "8px";
+    logo.style.display = "flex";
+    logo.style.alignItems = "center";
+    logo.style.justifyContent = "center";
+    logo.style.color = "white";
+    logo.style.fontWeight = "700";
+    logo.style.fontSize = "1.3rem";
+    logo.style.boxShadow = "0 4px 12px rgba(99, 102, 241, 0.2)";
+    logo.textContent = "KL";
+    header.appendChild(logo);
+
+    exportContainer.appendChild(header);
+
+    // Clone the table
+    const clonedTable = table.cloneNode(true);
+    
+    // Process the cloned table cells
+    const rows = clonedTable.querySelectorAll("tr");
+    rows.forEach(row => {
+      const cells = Array.from(row.cells);
+      for (let i = cells.length - 1; i >= 0; i--) {
+        const cell = cells[i];
+        
+        // Hide columns after the current month
+        if (i > currentMonthIndex + 2) {
+          cell.remove();
+        } else {
+          // Remove stickiness of headers/first columns so they render in standard grid flow
+          cell.style.position = "static";
+          cell.style.left = "auto";
+          cell.style.top = "auto";
+          cell.style.zIndex = "auto";
+          cell.style.transform = "none";
+          cell.style.borderColor = borderColor;
+          
+          // Force specific colors on key columns/rows if in dark mode
+          if (i === 0 || i === 1) {
+            cell.style.backgroundColor = isLight ? "#ffffff" : "#111827";
+          }
+          if (row.classList.contains("summary-row")) {
+            cell.style.backgroundColor = isLight ? "#ffffff" : "#111827";
+          }
+        }
+      }
+    });
+
+    exportContainer.appendChild(clonedTable);
+    document.body.appendChild(exportContainer);
+
+    // Use html2canvas to capture the offscreen node
+    const canvas = await html2canvas(exportContainer, {
+      backgroundColor: bgColor,
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      allowTaint: true
+    });
+
+    // Clean up temporary DOM element
+    document.body.removeChild(exportContainer);
+
+    // Trigger local download of image
+    const imgData = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = `KL2_Kuri_Board_Status_${MONTHS[currentMonthIndex]}_${currentYear}.png`;
+    link.href = imgData;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast("Image downloaded successfully!", "success");
+  } catch (error) {
+    console.error("Image export failed:", error);
+    showToast(`Failed to export image: ${error.message}`, "error");
+  }
+}

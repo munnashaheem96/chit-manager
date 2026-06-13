@@ -1,6 +1,7 @@
 import { doc, updateDoc, setDoc, getDoc, collection, addDoc, getDocs, query, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { showToast } from "./app.js";
 import { auth } from "./firebase.js";
+import { exportTableAsImage } from "./export.js";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -247,6 +248,25 @@ function setupBoardEvents(db) {
   document.getElementById("filter-pending").addEventListener("change", () => {
     renderBoard(db);
   });
+
+  // Download board table as image
+  const btnDownloadImage = document.getElementById("btn-download-image");
+  if (btnDownloadImage) {
+    btnDownloadImage.addEventListener("click", async () => {
+      // Commit any active edit before exporting
+      const activeCell = document.querySelector(".kuri-cell.editing");
+      if (activeCell) {
+        const input = activeCell.querySelector("input");
+        if (input) input.blur();
+      }
+      
+      const today = new Date();
+      const is2026OrLater = today.getFullYear() >= 2026;
+      const currentMonthIndex = is2026OrLater ? (today.getFullYear() > 2026 ? 11 : today.getMonth()) : 5;
+      
+      await exportTableAsImage("board-table", currentMonthIndex, MONTHS);
+    });
+  }
 
   // Keyboard navigation
   document.addEventListener("keydown", (e) => {
