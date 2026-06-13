@@ -46,6 +46,7 @@ export function initLots(db, members, ledgers, lots) {
   renderLotsTable(db);
   renderEligibleMembers();
   setupLotsForm(db);
+  setupSpinWheel();
 }
 
 function renderLotsDashboard() {
@@ -454,4 +455,217 @@ function recalculateBalanceAfter() {
   const totalPayout = localWinnersList.reduce((sum, w) => sum + w.lotAmount, 0);
   const after = Math.max(0, before - totalPayout);
   document.getElementById("lot-bal-after").value = after;
+}
+
+let candidates = [];
+let wheelAngle = 0;
+let isSpinning = false;
+
+function setupSpinWheel() {
+  const btnOpenWheel = document.getElementById("btn-open-wheel");
+  const modal = document.getElementById("wheel-modal");
+  const btnClose = document.getElementById("btn-close-wheel");
+  const btnSpinTrigger = document.getElementById("btn-spin-trigger");
+  const btnApply = document.getElementById("btn-apply-wheel-winner");
+  const canvas = document.getElementById("wheel-canvas");
+
+  if (!btnOpenWheel || !modal || !btnClose || !btnSpinTrigger || !btnApply || !canvas) return;
+
+  btnOpenWheel.onclick = () => {
+    const winnerSelect = document.getElementById("lot-winner-select");
+    const eligibleOptions = Array.from(winnerSelect.options).slice(1);
+    
+    if (eligibleOptions.length === 0) {
+      showToast("No eligible members available to spin!", "error");
+      return;
+    }
+
+    candidates = eligibleOptions.map(opt => {
+      const val = opt.value;
+      const text = opt.textContent;
+      const match = text.match(/^SL (\d+) - (.*)$/);
+      return {
+        id: val,
+        serialNo: match ? parseInt(match[1]) : 0,
+        name: match ? match[2] : text
+      };
+    });
+
+    // Reset wheel state
+    wheelAngle = Math.random() * Math.PI * 2;
+    isSpinning = false;
+    document.getElementById("wheel-winner-announcement").style.display = "none";
+    document.getElementById("wheel-winner-name").classList.remove("winner-highlight");
+    btnSpinTrigger.disabled = false;
+    btnSpinTrigger.style.opacity = "1";
+    
+    // Draw initial wheel
+    const isLight = document.body.classList.contains("light-mode");
+    drawWheel(canvas, wheelAngle, isLight);
+
+    modal.style.display = "flex";
+  };
+
+  btnClose.onclick = () => {
+    if (isSpinning) return; // prevent closing while spinning
+    modal.style.display = "none";
+  };
+
+  btnSpinTrigger.onclick = () => {
+    if (isSpinning) return;
+    isSpinning = true;
+    btnSpinTrigger.disabled = true;
+    btnSpinTrigger.style.opacity = "0.6";
+    document.getElementById("wheel-winner-announcement").style.display = "none";
+
+    let velocity = 0.5 + Math.random() * 0.4;
+    const friction = 0.982 + Math.random() * 0.006; // smooth friction deceleration
+
+    function animate() {
+      wheelAngle += velocity;
+      velocity *= friction;
+
+      const isLight = document.body.classList.contains("light-mode");
+      drawWheel(canvas, wheelAngle, isLight);
+
+      if (velocity > 0.001) {
+        requestAnimationFrame(animate);
+      } else {
+        isSpinning = false;
+        btnSpinTrigger.disabled = false;
+        btnSpinTrigger.style.opacity = "1";
+        
+        // Calculate winner
+        const arcSize = (2 * Math.PI) / candidates.length;
+        const relativeAngle = (1.5 * Math.PI - wheelAngle) % (2 * Math.PI);
+        const normalizedAngle = relativeAngle < 0 ? relativeAngle + 2 * Math.PI : relativeAngle;
+        const winnerIndex = Math.floor(normalizedAngle / arcSize);
+        const winner = candidates[winnerIndex];
+
+        // Announce winner
+        const announcement = document.getElementById("wheel-winner-announcement");
+        const nameEl = document.getElementById("wheel-winner-name");
+        nameEl.textContent = `${winner.name} (SL ${winner.serialNo})`;
+        nameEl.classList.add("winner-highlight");
+        announcement.style.display = "flex";
+
+        // Pop confetti at the center of the wheel
+        triggerConfetti(160, 160, canvas.parentElement);
+
+        btnApply.onclick = () => {
+          const winnerSelect = document.getElementById("lot-winner-select");
+          winnerSelect.value = winner.id;
+          modal.style.display = "none";
+          showToast(`Selected ${winner.name} as the winner!`, "success");
+        };
+      }
+    }
+
+    animate();
+  };
+}
+
+function drawWheel(canvas, currentAngle, isLight) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  const total = candidates.length;
+  const arcSize = (2 * Math.PI) / total;
+  
+  const colors = isLight 
+    ? ["#4f46e5", "#10b981", "#f59e0b", "#3b82f6", "#ec4899", "#8b5cf6", "#f43f5e"] 
+    : ["#6366f1", "#059669", "#d97706", "#2563eb", "#db2777", "#7c3aed", "#e11d48"];
+
+  ctx.save();
+  ctx.translate(160, 160);
+  ctx.rotate(currentAngle);
+  
+  for (let i = 0; i < total; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, 150, i * arcSize, (i + 1) * arcSize);
+    ctx.closePath();
+    
+    // Distribute colors evenly
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fill();
+    
+    ctx.strokeStyle = isLight ? "rgba(255, 255, 255, 0.4)" : "rgba(255, 255, 255, 0.15)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    
+    // Draw text in the slice
+    ctx.save();
+    ctx.rotate(i * arcSize + arcSize / 2);
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 11px 'Outfit', sans-serif";
+    
+    const displayName = candidates[i].name.length > 12 
+      ? candidates[i].name.slice(0, 10) + ".." 
+      : candidates[i].name;
+      
+    ctx.fillText(displayName, 135, 0);
+    ctx.restore();
+  }
+  
+  ctx.restore();
+  
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(160, 160, 150, 0, 2 * Math.PI);
+  ctx.strokeStyle = isLight ? "#4f46e5" : "#6366f1";
+  ctx.lineWidth = 6;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(160, 160, 153, 0, 2 * Math.PI);
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function triggerConfetti(startX, startY, parentElement) {
+  const colors = ["#ff5964", "#35a7ff", "#38b000", "#ffc857", "#e07a5f", "#6366f1"];
+  
+  for (let i = 0; i < 60; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-particle";
+    
+    // Random shape (square, circle, triangle)
+    const shape = Math.random();
+    if (shape < 0.33) {
+      p.style.borderRadius = "50%";
+    } else if (shape < 0.66) {
+      p.style.borderRadius = "0px";
+    } else {
+      // clip-path for triangle
+      p.style.clipPath = "polygon(50% 0%, 0% 100%, 100% 100%)";
+    }
+    
+    p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    p.style.width = `${6 + Math.random() * 8}px`;
+    p.style.height = `${6 + Math.random() * 8}px`;
+    
+    // Random directions
+    const angle = Math.random() * Math.PI * 2;
+    const distance = 80 + Math.random() * 140;
+    const destX = Math.cos(angle) * distance;
+    const destY = Math.sin(angle) * distance + 50; // gravity drop
+    const destR = (Math.random() * 720 - 360) + "deg";
+    
+    p.style.setProperty("--x", `${destX}px`);
+    p.style.setProperty("--y", `${destY}px`);
+    p.style.setProperty("--r", destR);
+    
+    p.style.left = `${startX}px`;
+    p.style.top = `${startY}px`;
+    
+    parentElement.appendChild(p);
+    
+    setTimeout(() => {
+      p.remove();
+    }, 1200);
+  }
 }
