@@ -236,10 +236,11 @@ export async function exportTableAsImage(tableId, currentMonthIndex, MONTHS) {
 
     // Create a temporary off-screen wrapper container for rendering
     const exportContainer = document.createElement("div");
-    exportContainer.style.position = "absolute";
-    exportContainer.style.left = "-9999px";
-    exportContainer.style.top = "-9999px";
-    exportContainer.style.width = "auto";
+    exportContainer.style.position = "fixed";
+    exportContainer.style.left = "0";
+    exportContainer.style.top = "0";
+    exportContainer.style.zIndex = "-9999";
+    exportContainer.style.width = "max-content";
     exportContainer.style.padding = "24px";
 
     const isLight = document.body.classList.contains("light-mode");
@@ -328,8 +329,7 @@ export async function exportTableAsImage(tableId, currentMonthIndex, MONTHS) {
       backgroundColor: bgColor,
       scale: 2,
       logging: false,
-      useCORS: true,
-      allowTaint: true
+      useCORS: true
     });
 
     // Clean up temporary DOM element
